@@ -77,7 +77,7 @@ class Camera:
         # TODO: implement rolling shutter (readout time)
         self.sensor.accumulate(lens=self.lens, sky_mag=sky_mag, exposure_time=exposure_time, temperature=temperature, xcoords=xcoords, ycoords=ycoords, magnitudes=mags)
 
-        return self.sensor.readout().value.T
+        return self.sensor.readout().value
 
 
     def _getImageCoords(self, ra, dec):

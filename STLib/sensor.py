@@ -68,14 +68,14 @@ class Sensor:
         self.full_well      = float(full_well_capacity) * units.electron
         self.bloom          = bloom
         self.readout_time   = float(readout_time) * units.s
-        self.pixels         = np.zeros((self.width_px, self.height_px)) * units.electron
+        self.pixels         = np.zeros((self.height_px, self.width_px)) * units.electron
 
         if not self.bloom.issubset({'+x','-x','+y','-y'}):
             raise ValueError("Argument `bloom` must be a subset of {'+x','-x','+y','-y'}.")
         
     
     def clear(self):
-        self.pixels = np.zeros((self.width_px, self.height_px)) * units.electron
+        self.pixels = np.zeros((self.height_px, self.width_px)) * units.electron
 
 
     def accumulate(self, 
@@ -97,13 +97,13 @@ class Sensor:
         # sky background flux
 
         bg_count = self._getBackgroundFluxPerPixel(sky_mag=sky_mag, lens=lens) * exposure_time * units.pixel
-        self.pixels += np.random.poisson(bg_count.to(units.electron).value, (self.width_px, self.height_px)) * units.electron
+        self.pixels += np.random.poisson(bg_count.to(units.electron).value, (self.height_px, self.width_px)) * units.electron
 
         # dark current
 
         dark_current = self.dark_current(temperature) * units.pA / units.cm**2
         dark_count = dark_current.to(units.electron/units.s/units.micron**2, equivalencies=electron_current_density) * exposure_time * self.px_area
-        self.pixels += np.random.poisson(dark_count.to(units.electron).value, (self.width_px, self.height_px)) * units.electron
+        self.pixels += np.random.poisson(dark_count.to(units.electron).value, (self.height_px, self.width_px)) * units.electron
         
         # saturation and bloom
 
@@ -117,7 +117,7 @@ class Sensor:
         if self.readout_time == 0:
             
             # read noise
-            self.pixels += np.random.poisson(self.read_noise.to(units.electron).value, (self.width_px, self.height_px)) * units.electron
+            self.pixels += np.random.poisson(self.read_noise.to(units.electron).value, (self.height_px, self.width_px)) * units.electron
 
             # analog to digital conversion
             return np.floor(self.pixels / self.gain)
@@ -168,7 +168,7 @@ class Sensor:
                     # but the psf we defined is psf(x,y)
                     # count = i * dblquad(lens.psf, y_lb, y_ub, x_lb, x_ub, epsabs=1e-1, epsrel=1e-1)[0]  # TODO: assess integration error?
                     
-                    self.pixels[idx,idy] += np.random.poisson(count.to(units.electron).value) * units.electron
+                    self.pixels[idy,idx] += np.random.poisson(count.to(units.electron).value) * units.electron
                     
         return
         
@@ -181,10 +181,10 @@ class Sensor:
         
         conv_filter = np.zeros((3,3))
         frac = 1.0 / len(self.bloom)
-        conv_filter[0,1] = frac if '-x' in self.bloom else 0
-        conv_filter[2,1] = frac if '+x' in self.bloom else 0
-        conv_filter[1,0] = frac if '-y' in self.bloom else 0
-        conv_filter[1,2] = frac if '+y' in self.bloom else 0
+        conv_filter[1,0] = frac if '-x' in self.bloom else 0
+        conv_filter[1,2] = frac if '+x' in self.bloom else 0
+        conv_filter[0,1] = frac if '-y' in self.bloom else 0
+        conv_filter[2,1] = frac if '+y' in self.bloom else 0
         while True:
             excess = np.maximum(0, self.pixels - self.full_well)
             if not any(excess.flatten().value > 0):
