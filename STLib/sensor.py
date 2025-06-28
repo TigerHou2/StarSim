@@ -8,8 +8,8 @@ from astropy import units
 import astropy.constants as const
 
 from numpy.typing import ArrayLike
-from typing import Union, Tuple, Callable
-from .utils import timer
+from typing import Union, Callable
+from .utils import timer, type_checker
 
 Number = Union[int, float]
 
@@ -18,23 +18,28 @@ electron_current_density = [(units.pA/units.m**2, units.electron/units.s/units.m
 
 class Sensor:
 
+    @type_checker
     def __init__(self, *, 
                  width_px               : int, 
                  height_px              : int, 
-                 px_len                 : Union[Number, Tuple[Number, Number]], 
-                 px_pitch               : Union[Number, Tuple[Number, Number]], 
+                 px_len                 : Union[Number, tuple[Number, Number]], 
+                 px_pitch               : Union[Number, tuple[Number, Number]], 
                  quantum_efficiency     : Number, 
                  filter_efficiency      : Number,
                  band                   : str,
                  dark_current           : Callable[[Number], float], 
+                 hot_pixels             : Union[None, ArrayLike],
                  read_noise             : Number,
                  gain                   : Number, 
+                 bias                   : Union[int, ArrayLike], 
                  full_well_capacity     : Number, 
+                 adc_limit              : int,
                  bloom                  : set, 
                  readout_time           : Number):
         
         self.width_px  = int(width_px)
         self.height_px = int(height_px)
+        self.pixels    = np.zeros((self.height_px, self.width_px)) * units.electron
 
         if isinstance(px_len, tuple):
             self.px_len_x = float(px_len[0]) * units.micron
@@ -63,12 +68,39 @@ class Sensor:
         self.band = band
     
         self.dark_current   = dark_current  # pA / cm**2
+        
+        if hot_pixels is None:
+            self.hot_pixels = np.ones_like(self.pixels.value)
+        else:
+            self.hot_pixels = np.asarray(hot_pixels)
+            if self.hot_pixels.shape != (self.height_px, self.width_px):
+                raise ValueError("Argument `hot_pixels` must be None or 2D array_like with shape (`height_px`, `width_px`).")
+
         self.read_noise     = float(read_noise) * units.electron
-        self.gain           = float(gain) * units.electron / units.adu
+        self.gain           = float(gain) * units.adu / units.electron
+
+        bias = np.asanyarray(bias, dtype=int)
+        _ERR_bias = ValueError("Argument `bias` must be an integer, 1D array_like with length `width_px`, or 2D array_like with shape (`height_px`, `width_px`).")
+        if bias.ndim == 0:
+            pass
+        elif bias.ndim == 1:
+            if len(bias) == 1:
+                pass
+            if len(bias) == self.width_px:
+                bias = np.tile(bias, (self.height_px, 1))
+            else:
+                raise _ERR_bias
+        elif bias.ndim == 2:
+            if bias.shape != (self.height_px, self.width_px):
+                raise _ERR_bias
+        else:
+            raise _ERR_bias
+        self.bias = bias * units.adu
+
         self.full_well      = float(full_well_capacity) * units.electron
+        self.adc_limit      = adc_limit * units.adu
         self.bloom          = bloom
         self.readout_time   = float(readout_time) * units.s
-        self.pixels         = np.zeros((self.height_px, self.width_px)) * units.electron
 
         if not self.bloom.issubset({'+x','-x','+y','-y'}):
             raise ValueError("Argument `bloom` must be a subset of {'+x','-x','+y','-y'}.")
@@ -103,7 +135,8 @@ class Sensor:
 
         dark_current = self.dark_current(temperature) * units.pA / units.cm**2
         dark_count = dark_current.to(units.electron/units.s/units.micron**2, equivalencies=electron_current_density) * exposure_time * self.px_area
-        self.pixels += np.random.poisson(dark_count.to(units.electron).value, (self.height_px, self.width_px)) * units.electron
+        dark_lambda = self.hot_pixels * dark_count.to(units.electron).value
+        self.pixels += np.random.poisson(dark_lambda) * units.electron
         
         # saturation and bloom
 
@@ -113,20 +146,14 @@ class Sensor:
     def readout(self):
 
         # global shutter
-
-        if self.readout_time == 0:
             
-            # read noise
-            self.pixels += np.random.poisson(self.read_noise.to(units.electron).value, (self.height_px, self.width_px)) * units.electron
+        # read noise
+        self.pixels += np.random.poisson(self.read_noise.to(units.electron).value, (self.height_px, self.width_px)) * units.electron
 
-            # analog to digital conversion
-            return np.floor(self.pixels / self.gain)
+        # analog to digital conversion, clip to ADC limit
+        return np.minimum(np.floor(self.pixels * self.gain) + self.bias, self.adc_limit)
 
         # TODO: implement rolling shutter?
-
-        else:
-
-            return self.pixels
 
 
     @timer

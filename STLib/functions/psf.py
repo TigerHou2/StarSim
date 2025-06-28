@@ -6,12 +6,15 @@ from scipy.stats import multivariate_normal
 
 import warnings
 
+from typing import Union
+Number = Union[int, float]
+
 
 def airyPSFModel(wavelength, aperture, focal_length):
     wavelength = wavelength.to(units.micron).value
     aperture_radius = aperture.to(units.micron).value/2  # the Airy disk calcs use aperture **radius**, not diameter
     focal_length = focal_length.to(units.micron).value
-    def airyPSF(x, y):
+    def airyPSF(x: Number, y: Number) -> float:
         r = np.sqrt(x**2 + y**2)
         v = 2 * np.pi * aperture_radius * r / wavelength / np.sqrt(r**2 + focal_length**2)
         v += (v==0) * 1e-16             # FIXME: find a better smooth way to handle discontinuity at x,y = 0?
@@ -28,14 +31,14 @@ def airyPSFModel(wavelength, aperture, focal_length):
 def gaussianPSFModel(sigma):
     sigma = sigma.to(units.micron).value
     distr = multivariate_normal(mean=[0,0], cov=sigma)
-    def gaussianPSF(x, y):
+    def gaussianPSF(x: Number, y: Number) -> float:
         return distr.pdf(np.array([x,y]).T)
     return gaussianPSF
 
 
 def pillboxPSFModel(radius, sharpness=50):
     radius = radius.to(units.micron).value
-    def pillboxPSF(x, y):
+    def pillboxPSF(x: Number, y: Number) -> float:
         r2 = x**2 + y**2
         return 1/(1+np.exp(sharpness*(r2-radius**2)/radius**2))/(np.pi*radius**2)
     return pillboxPSF
@@ -50,7 +53,7 @@ def defocusPSFModel(wavelength, aperture, focal_length, defocus, nowarn=False):
     aperture = aperture.to(units.micron).value
     focal_length = focal_length.to(units.micron).value
     defocus = defocus.to(units.micron).value
-    def defocusPSF(x, y):
+    def defocusPSF(x: Number, y: Number) -> float:
         r = np.sqrt(x**2 + y**2)
         N = focal_length / aperture
         integral = quad_vec(lambda rho: np.exp(1j*2*np.pi/wavelength*defocus*rho**2) * j0(np.pi*r*rho/wavelength/N) * rho, 0, 1, epsabs=1e-10, epsrel=1e-8)[0]

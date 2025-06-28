@@ -1,10 +1,10 @@
 # Star Tracker Image Simulator
 
-This package simulates star tracker images of distant stars (and hopefully unresolved asteroids/planets in the future). 
+This package simulates star tracker images of distant stars (and hopefully unresolved asteroids/planets in the future) given lens + sensor specifications and camera orientation. 
 
 The effects considered include lens distortion, the point spread function, transmission/filter/quantum efficiencies, shot noise, dark current, read noise, saturation, and bloom. 
 
-Given a set of stars defined by their (ra, dec, magnitude), one can generate simulated images based on a specified camera orientation. 
+[__Check out an example here__](https://html-preview.github.io/?url=https://github.com/TigerHou2/star-tracker-image-sim/blob/main/examples/gaia.html).
 
 
 ## Available Models
