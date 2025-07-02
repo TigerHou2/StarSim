@@ -19,7 +19,8 @@ The effects considered include lens distortion, the point spread function, trans
 - Defocus (Wyant and Creath)
 
 ### Filter/Quantum Efficiency
-- Average over designated bandpass
+- Integrate over stellar spectra given transmission curve
+- Average over designated bandpass if only magnitude + zero point available
 
 ### Dark Current
 - Exponential temperature
