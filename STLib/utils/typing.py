@@ -1,4 +1,3 @@
-import time
 import functools
 import inspect
 import numpy as np
@@ -6,29 +5,6 @@ from typing import get_type_hints, Union, get_origin, get_args
 from collections.abc import Callable
 
 Number = Union[int, float]
-
-
-# Module-level flag to enable/disable timing
-ENABLE_TIMER = True
-
-# function timing
-def timer(func):
-
-    @functools.wraps(func)
-    def wrapper(*args, **kwargs):
-
-        if not ENABLE_TIMER:
-            return func(*args, **kwargs)
-        
-        start_time = time.process_time()
-        result = func(*args, **kwargs)
-        end_time = time.process_time()
-        elapsed = end_time - start_time
-
-        print(f"Function '{func.__name__}' took {elapsed:.3f} seconds.")
-        return result
-    
-    return wrapper
 
 
 def type_checker(func):
@@ -69,6 +45,14 @@ def type_checker(func):
         # Handle numpy arrays
         if isinstance(expected_type, type) and issubclass(expected_type, np.ndarray):
             return isinstance(value, np.ndarray)
+        
+        # Handle tuples
+        if origin is tuple:
+            if not isinstance(value, tuple):
+                return False
+            if len(args) != len(value):
+                return False
+            return all(_check_type(v, arg) for v, arg in zip(value, args))
 
         # Handle regular type
         if isinstance(expected_type, type):

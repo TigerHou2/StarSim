@@ -1,22 +1,20 @@
+from astropy import units
 import numpy as np
 
-from astropy import units
-import astropy.constants as const
-
 from numpy.typing import ArrayLike
-from typing import Union, Tuple, Callable
-from .utils import timer
+from typing import Union, Callable
 
-Number = Union[int, float]
+from .utils import type_checker, Number
 
 class Lens:
 
+    @type_checker
     def __init__(self, *, 
-                 aperture       : Number,
-                 focal_length   : Number,
+                 aperture       : units.Quantity,
+                 focal_length   : units.Quantity,
                  transmission_efficiency: Number,
                  psf: Callable[[Number, Number], float],
-                 psf_bounds: Union[Number, Tuple[Number, Number]],
+                 psf_bounds: Union[Number, tuple[Number, Number]],
                  k1 : Number = 0,
                  k2 : Number = 0,
                  k3 : Number = 0,
@@ -26,8 +24,8 @@ class Lens:
                  p1 : Number = 0,
                  p2 : Number = 0):
     
-        self.D = float(aperture) * units.mm
-        self.f = float(focal_length) * units.mm
+        self.D = aperture.to(units.mm)
+        self.f = focal_length.to(units.mm)
         self.transmission_eff = float(transmission_efficiency)
         self.k1 = float(k1)
         self.k2 = float(k2)
@@ -38,6 +36,7 @@ class Lens:
         self.p1 = float(p1)
         self.p2 = float(p2)
         self.psf = psf
+        self.area = np.pi * (self.D/2)**2
     
         if isinstance(psf_bounds, tuple):
             self.psf_bounds_x = float(psf_bounds[0])

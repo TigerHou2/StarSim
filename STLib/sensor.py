@@ -1,17 +1,13 @@
 import numpy as np
 from .lens import Lens
 
-from scipy.integrate import dblquad
 from scipy.signal import convolve2d
 
 from astropy import units
-import astropy.constants as const
 
 from numpy.typing import ArrayLike
 from typing import Union, Callable
-from .utils import timer, type_checker
-
-Number = Union[int, float]
+from .utils import timer, type_checker, Number
 
 # create a new equivalency where 1 pA = 6.28e6 e-/s
 electron_current_density = [(units.pA/units.m**2, units.electron/units.s/units.m**2, lambda x: x * 6.28e6, lambda x: x / 6.28e6)]
@@ -25,8 +21,6 @@ class Sensor:
                  px_len                 : Union[Number, tuple[Number, Number]], 
                  px_pitch               : Union[Number, tuple[Number, Number]], 
                  quantum_efficiency     : Number, 
-                 filter_efficiency      : Number,
-                 band                   : str,
                  dark_current           : Callable[[Number], float], 
                  hot_pixels             : Union[None, ArrayLike],
                  read_noise             : Number,
@@ -61,11 +55,6 @@ class Sensor:
         self.height = (self.height_px+1) * self.px_pitch_y - self.px_len_y
 
         self.quantum_eff    = float(quantum_efficiency)
-        self.filter_eff = float(filter_efficiency)
-    
-        if band not in ['U','B','V','R','I','J','H','K','u','g','r','i','z']:
-            raise ValueError(f"Argument `band` must be in [U,B,V,R,I,J,H,K,u,g,r,i,z], got `{band}`.")
-        self.band = band
     
         self.dark_current   = dark_current  # pA / cm**2
         
@@ -112,24 +101,26 @@ class Sensor:
 
     def accumulate(self, 
                    lens: Lens,
-                   sky_mag: float,
                    exposure_time : float,
                    temperature   : float,
                    xcoords       : ArrayLike,   # distance coordinates (relative to top left corner)
                    ycoords       : ArrayLike, 
-                   magnitudes    : ArrayLike):
+                   photon_flux_density  : ArrayLike,
+                   background_flux      : ArrayLike):
         
         exposure_time *= units.s
         
         # source flux
 
-        intensities = units.Quantity([self._getSourceFlux(magnitude=mag, lens=lens) * exposure_time for mag in magnitudes])
-        self._applyPSF(lens, xcoords, ycoords, intensities)
+        # electron_dose = units.Quantity([self._getSourceFlux(magnitude=mag, lens=lens) * exposure_time for mag in photon_flux_density])
+        if len(photon_flux_density) > 0:
+            electron_dose = photon_flux_density * exposure_time * self.quantum_eff * lens.area
+            self._applyPSF(lens, xcoords, ycoords, electron_dose)
 
         # sky background flux
 
-        bg_count = self._getBackgroundFluxPerPixel(sky_mag=sky_mag, lens=lens) * exposure_time * units.pixel
-        self.pixels += np.random.poisson(bg_count.to(units.electron).value, (self.height_px, self.width_px)) * units.electron
+        bg_electron_dose = background_flux * exposure_time * units.pixel * lens.area
+        self.pixels += np.random.poisson(bg_electron_dose.to(units.electron).value, (self.height_px, self.width_px)) * units.electron
 
         # dark current
 
@@ -161,9 +152,9 @@ class Sensor:
                   lens          : Lens, 
                   xcoords       : ArrayLike, 
                   ycoords       : ArrayLike, 
-                  intensities   : ArrayLike):
+                  electron_dose : ArrayLike):
         
-        for x, y, i in zip(xcoords, ycoords, intensities):
+        for x, y, i in zip(xcoords, ycoords, electron_dose):
 
             # find the center pixel
 
@@ -220,104 +211,4 @@ class Sensor:
             self.pixels += np.floor(convolve2d(excess.to(units.electron).value, conv_filter, mode='same', boundary='fill', fillvalue=0)) * units.electron
         
         return
-
-
-    def _getSourceFlux(self, *, 
-                       magnitude: Union[int, float], 
-                       lens: Lens):
-        # flux zeropoint reference:
-        # https://www.astronomy.ohio-state.edu/martini.10/usefuldata.html
-        match self.band:
-            case 'U':
-                f_ref        = 1.79e-20
-                eff_lambda   = 0.36
-                delta_lambda = 0.06
-            case 'B':
-                f_ref        = 4.063e-20
-                eff_lambda   = 0.438
-                delta_lambda = 0.09
-            case 'V':
-                f_ref        = 3.636e-20
-                eff_lambda   = 0.545
-                delta_lambda = 0.085
-            case 'R':
-                f_ref        = 3.064e-20
-                eff_lambda   = 0.641
-                delta_lambda = 0.15
-            case 'I':
-                f_ref        = 2.416e-20
-                eff_lambda   = 0.798
-                delta_lambda = 0.15
-            case 'J':
-                f_ref        = 1.589e-20
-                eff_lambda   = 1.22
-                delta_lambda = 0.26
-            case 'H':
-                f_ref        = 1.021e-20
-                eff_lambda   = 1.63
-                delta_lambda = 0.29
-            case 'K':
-                f_ref        = 0.64e-20
-                eff_lambda   = 2.19
-                delta_lambda = 0.41
-            case 'u':
-                f_ref        = 3.631e-20
-                eff_lambda   = 0.356
-                delta_lambda = 0.0463
-            case 'g':
-                f_ref        = 3.631e-20
-                eff_lambda   = 0.483
-                delta_lambda = 0.0988
-            case 'r':
-                f_ref        = 3.631e-20
-                eff_lambda   = 0.626
-                delta_lambda = 0.0955
-            case 'i':
-                f_ref        = 3.631e-20
-                eff_lambda   = 0.767
-                delta_lambda = 0.1064
-            case 'z':
-                f_ref        = 3.631e-20
-                eff_lambda   = 0.910
-                delta_lambda = 0.1248
-            case _:
-                raise ValueError(f"Sensor parameter `band` must be in [U,B,V,R,I,J,H,K,u,g,r,i,z], got `{self.band}`.")
-            
-        # calculate the average electron energy in the filter
-        f_ref *= units.erg / units.cm**2 / units.s / units.Hz
-        eff_lambda *= units.micron
-        delta_lambda *= units.micron
-
-        delta_wavelength = (eff_lambda - delta_lambda/2).to(units.Hz, equivalencies=units.spectral()) \
-                         - (eff_lambda + delta_lambda/2).to(units.Hz, equivalencies=units.spectral())
-        E_e = const.h * const.c / eff_lambda / units.electron
-        
-        # convert magnitude to flux density
-        f_source = f_ref * 10**((0. - magnitude) / 2.5)
-
-        # convert flux density to photon flux density
-        f_photon = f_source / E_e
-
-        # multiply by area and bandwidth to get photons per second
-        photon_rate = f_photon * np.pi * (lens.D/2)**2 * delta_wavelength
-
-        # total efficiency
-        photon_rate *= self.quantum_eff * self.filter_eff * lens.transmission_eff
-
-        return photon_rate.to(units.electron/units.s)
-
-
-    def _getBackgroundFluxPerPixel( self, 
-                                    sky_mag: Union[int, float], 
-                                    lens: Lens):
-        
-        plate_scale = 206265 * units.arcsec / lens.f.to(units.mm)
-        pixel_scale = (plate_scale**2 * self.px_area / units.pixel).to(units.arcsec**2/units.pixel)
-
-        # the sky background is everywhere, so the magnitude is given in mag/arcsec^2
-        bg_rate = self._getSourceFlux(magnitude=sky_mag, lens=lens) / (units.arcsec**2)
-
-        # multiply by pixel size to get rate per pixel
-        bg_rate = bg_rate * pixel_scale
-
-        return bg_rate.to(units.electron/units.s/units.pixel)
+    
