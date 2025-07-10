@@ -104,4 +104,5 @@ def horizonsQuery(start_time, stop_time, sbdb_path, max_cache_age=DEFAULT_CACHE_
             print("response code: {0}".format(response.status_code))
             continue
 
+    spice.unload([LEAPSECONDS_KERNEL, DE_KERNEL])
     return kernels

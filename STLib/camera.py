@@ -1,15 +1,19 @@
 import numpy as np
 from astropy import units
 import astropy.constants as const
+from astropy.time import Time
 from astropy.modeling.rotations import EulerAngleRotation
+
+import spiceypy as spice
 
 from scipy.interpolate import CubicSpline
 
 from .lens import Lens
 from .filter import Filter
 from .sensor import Sensor
-from .sources import Sources, SpectralSources, MagnitudeSources
+from .sources import AstronomicalSources, SpectralSources, MagnitudeSources, SolarSystemSources
 from .utils import type_checker, Number
+from . import LEAPSECONDS_KERNEL, DE_KERNEL, JOHNSON_V_FILTER_PATH
 
 from typing import Union
 from numpy.typing import ArrayLike
@@ -21,11 +25,13 @@ class Camera:
                  lens   : Lens,
                  filter_: Filter,
                  sensor : Sensor,
-                 sources: Union[Sources, list],
+                 sources: Union[AstronomicalSources, list],
                  sky_mag: Number,
+                 kernel : str, 
                  ra     : units.Quantity = 0 * units.degree,
                  dec    : units.Quantity = 0 * units.degree,
                  roll   : units.Quantity = 0 * units.degree,
+                 time   : Time = Time("2025-01-01", format='iso', scale='utc')
                  ):
         
         self._lens        = None
@@ -45,24 +51,40 @@ class Camera:
         self._ra          = None
         self._dec         = None
         self._roll        = None
+        self._kernel      = '_empty.bsp'
+        self._spkid       = None
+        self._pos         = None
+        self._vel         = None
+        self._time        = None
+        zero_point_V = (363.1e-110 * units.erg / units.cm**2 / units.s / units.angstrom).to(units.W/units.nm/units.m**2)
+        self._filter_V    = Filter(zp_flux=zero_point_V, file=JOHNSON_V_FILTER_PATH)
 
+        self.kernel       = kernel
         self.sources      = sources
         self.filter_      = filter_
         self.lens         = lens
         self.sensor       = sensor
         self.sky_mag      = sky_mag
         self.orientation  = [ra, dec, roll]
+        self.time         = time
 
 
     @property
     def sources(self):
         return self._sources
     @sources.setter
-    def sources(self, sources: Union[Sources, list]):
-        if isinstance(sources, Sources):
+    def sources(self, sources: Union[AstronomicalSources, SolarSystemSources, list]):
+        if not isinstance(sources, list):
             self._sources = [sources]
         else:
             self._sources = sources
+
+        spice.furnsh(self._kernel)
+        for source in self._sources:
+            if isinstance(source, SolarSystemSources):
+                source.update(self._spkid, self._time)
+        spice.unload(self._kernel)
+                
         self.updateFlux()
 
     @property
@@ -108,7 +130,7 @@ class Camera:
     
     @property
     def fov(self):
-        return [self._fov_x, self._fov_y]
+        return [self._fov_x.to(units.degree), self._fov_y.to(units.degree)]
     
     @property
     def sky_mag(self):
@@ -152,6 +174,53 @@ class Camera:
         self._roll = rotations[2].to(units.deg)
         self._calcCoordTransforms()
 
+    @property
+    def kernel(self):
+        return self._kernel
+    @kernel.setter
+    def kernel(self, kernel: str):
+        self._kernel = kernel
+        spice.furnsh(self._kernel)
+        self._spkid = str(spice.spkobj(self._kernel)[0])
+        spice.unload(self._kernel)
+        # TODO: recompute solar system objects, stellar aberration, and redshift
+
+    @property
+    def spkid(self):
+        return self._spkid
+
+    @property
+    def pos(self):
+        return self._pos
+
+    @property
+    def vel(self):
+        return self._vel
+
+    @property
+    def time(self):
+        return self._time
+    @time.setter
+    def time(self, time):
+        self._time = time
+        
+        spice.furnsh([LEAPSECONDS_KERNEL, DE_KERNEL, self._kernel])
+
+        et = spice.datetime2et(time.to_datetime())
+        state = spice.spkezr(self._spkid, et, "J2000", "NONE", "SSB")[0]
+        self._pos = state[:3] * units.km
+        self._vel = state[3:] * units.km / units.s
+        spice.unload([LEAPSECONDS_KERNEL, DE_KERNEL])
+
+        # TODO: recompute solar system objects, stellar aberration, and redshift
+        for source in self._sources:
+            if isinstance(source, SolarSystemSources):
+                source.update(self._spkid, self._time)
+        spice.unload(self._kernel)
+
+        self.updateFlux()
+
+
     
     def _calcCoordTransforms(self):
         '''
@@ -191,6 +260,8 @@ class Camera:
                 photon_flux_densities.append(self.calcPhotonFluxDensityFromSpectral(sources))
             elif isinstance(sources, MagnitudeSources):
                 photon_flux_densities.append(self.calcPhotonFluxDensityFromMagnitude(sources))
+            elif isinstance(sources, SolarSystemSources):
+                photon_flux_densities.append(self.calcPhotonFluxDensitySmallBody(sources))
             else:
                 raise ValueError("Unknown light source format. ")
             
@@ -253,12 +324,42 @@ class Camera:
         return x_distorted, y_distorted, mask
     
 
+    def calcPhotonFluxDensitySmallBody(self, sources: SolarSystemSources):
+
+        # SolarSystemSources have phase curves defined in the V band, so we will need to do some extra work to be able to convert their spectra.
+        # 1. using the normalized spectra, we can compute the normalized flux in V (P_V')
+        # 2. using the phase curve, we can compute the magnitude in V -> therefore compute flux in V using the Vega zero point. (P_V)
+        # 3. using the normalized spectra, we can compute the normalized flux in the camera's filter (P_F')
+        # 4. finally, the actual flux in the camera's filter (P_F) = P_F' * (P_V / P_V')
+        F_Vega = (363.1e-110 * units.erg / units.cm**2 / units.s / units.angstrom).to(units.W/units.nm/units.m**2)
+        V_bandwidth = 85 * units.nm
+        P_Vega = 995.5 * units.electron / units.cm**2 / units.s / units.angstrom * V_bandwidth
+
+        tx_wavelengths = self._filter_V.wavelengths.to(units.nm)
+
+        nsfd_spl = [CubicSpline(w.to(units.nm), s * F_Vega)(tx_wavelengths)
+                    for w, s in zip(sources.sample_wavelengths, sources.normalized_spectra)]
+        nsfd_spl = np.asarray(nsfd_spl) * units.W/units.nm/units.m**2 
+
+        P_V_prime = self._calcPhotonFluxDensityFromSpectral(self._filter_V, nsfd_spl, tx_wavelengths)
+        P_V = P_Vega * 10**(-sources.magnitudes/2.5)
+
+        P_F_prime = self._calcPhotonFluxDensityFromSpectral(self._filter, nsfd_spl, tx_wavelengths)
+        P_F = P_F_prime * P_V / P_V_prime
+        return P_F.to(units.electron/units.s/units.m**2)
+    
+
     def calcPhotonFluxDensityFromSpectral(self, sources: SpectralSources, sample_wavelengths=None):
 
-        spectral_flux_density = sources.spectral_flux_density.to(units.W/units.nm/units.m**2)
-        sfd_wavelengths = sources.sfd_wavelength.to(units.nm)
-        transmission = self._filter.transmission
-        tx_wavelengths = self._filter.wavelengths.to(units.nm)
+        return self._calcPhotonFluxDensityFromSpectral(self._filter, sources.spectral_flux_density, sources.sfd_wavelength, sample_wavelengths)
+    
+
+    def _calcPhotonFluxDensityFromSpectral(self, filter_, spectral_flux_density, sfd_wavelengths, sample_wavelengths=None):
+
+        spectral_flux_density = spectral_flux_density.to(units.W/units.nm/units.m**2)
+        sfd_wavelengths = sfd_wavelengths.to(units.nm)
+        transmission = filter_.transmission
+        tx_wavelengths = filter_.wavelengths.to(units.nm)
 
         # use provided sampling wavelengths or choose the overlapping wavelengths between flux and transmission, preferring highest-density sampling
         if not sample_wavelengths:
@@ -282,13 +383,13 @@ class Camera:
 
     def calcPhotonFluxDensityFromMagnitude(self, sources: MagnitudeSources):
 
-        return self._calcPhotonFluxDensityFromMagnitude(sources.magnitude)
+        return self._calcPhotonFluxDensityFromMagnitude(self._filter, sources.magnitude)
     
 
-    def _calcPhotonFluxDensityFromMagnitude(self, magnitudes):
+    def _calcPhotonFluxDensityFromMagnitude(self, filter_, magnitudes):
 
-        flux = self._filter.zp_flux * 10**((0. - magnitudes) / 2.5) * self._filter.fwhm
-        electron_energy = const.h * const.c / self._filter.eff_wavelength / units.electron
+        flux = filter_.zp_flux * 10**((0. - magnitudes) / 2.5) * filter_.fwhm
+        electron_energy = const.h * const.c / filter_.eff_wavelength / units.electron
         photon_flux_density = flux / electron_energy * self._lens.transmission_eff
         return photon_flux_density.to(units.electron/units.s/units.micron**2)
 
@@ -298,7 +399,7 @@ class Camera:
         pixel_scale = (self._px_scale_x * self._px_scale_y / units.pixel).to(units.arcsec**2/units.pixel)
 
         # the sky background is everywhere, so the magnitude is given in mag/arcsec^2
-        bg_photon_flux_density = self._calcPhotonFluxDensityFromMagnitude(self._sky_mag) / (units.arcsec**2)
+        bg_photon_flux_density = self._calcPhotonFluxDensityFromMagnitude(self._filter, self._sky_mag) / (units.arcsec**2)
 
         # multiply by pixel scale to get rate per pixel
         bg_photon_flux = bg_photon_flux_density * pixel_scale

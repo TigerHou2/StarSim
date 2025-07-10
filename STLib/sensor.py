@@ -112,7 +112,6 @@ class Sensor:
         
         # source flux
 
-        # electron_dose = units.Quantity([self._getSourceFlux(magnitude=mag, lens=lens) * exposure_time for mag in photon_flux_density])
         if len(photon_flux_density) > 0:
             electron_dose = photon_flux_density * exposure_time * self.quantum_eff * lens.area
             self._applyPSF(lens, xcoords, ycoords, electron_dose)
@@ -153,7 +152,16 @@ class Sensor:
                   xcoords       : ArrayLike, 
                   ycoords       : ArrayLike, 
                   electron_dose : ArrayLike):
+
+        # for each pixel, at least sample four corners for integration
+        nx = max(2, int(np.ceil((self.px_len_x / lens.psf_resolution).to(units.dimensionless_unscaled))))
+        ny = max(2, int(np.ceil((self.px_len_y / lens.psf_resolution).to(units.dimensionless_unscaled))))
         
+        # how many pixels in the ±x/y directions to do integration, 
+        # relative to the pixel containing of center of the light source
+        px_bounds_x = np.ceil((lens.psf_bounds_x / self.px_len_x).to(units.dimensionless_unscaled).value)
+        px_bounds_y = np.ceil((lens.psf_bounds_y / self.px_len_y).to(units.dimensionless_unscaled).value)
+
         for x, y, i in zip(xcoords, ycoords, electron_dose):
 
             # find the center pixel
@@ -161,36 +169,38 @@ class Sensor:
             xi = int(np.round(x / (self.width  - 2*self.px_pitch_x + self.px_len_x) * self.width_px ).to(units.dimensionless_unscaled).value)
             yi = int(np.round(y / (self.height - 2*self.px_pitch_y + self.px_len_y) * self.height_px).to(units.dimensionless_unscaled).value)
 
-            # integrate PSF over each pixel within lens.psf_bounds_x/y
+            # integrate PSF over each pixel
 
-            xmin = max(int(np.floor(xi-lens.psf_bounds_x)), 0)
-            ymin = max(int(np.floor(yi-lens.psf_bounds_y)), 0)
-            xmax = min(int(np.ceil( xi+lens.psf_bounds_x)), self.width_px)
-            ymax = min(int(np.ceil( yi+lens.psf_bounds_y)), self.height_px)
+            xmin = max(int(np.floor(xi - px_bounds_x)), 0)
+            ymin = max(int(np.floor(yi - px_bounds_y)), 0)
+            xmax = min(int(np.ceil( xi + px_bounds_x)), self.width_px)
+            ymax = min(int(np.ceil( yi + px_bounds_y)), self.height_px)
 
             for idx in range(xmin,xmax):
+
+                x_lb = ((self.px_pitch_x * idx - self.px_len_x) - x).to(units.micron).value  # convert to distance units relative to psf center
+                x_ub = ((self.px_pitch_x * idx)                 - x).to(units.micron).value
+                _x = np.linspace(x_lb, x_ub, nx)
+
                 for idy in range(ymin,ymax):
-                    x_lb = ((self.px_pitch_x * idx - self.px_len_x) - x).to(units.micron).value  # convert to distance units relative to psf center
-                    x_ub = ((self.px_pitch_x * idx)                 - x).to(units.micron).value
+                    
                     y_lb = ((self.px_pitch_y * idy - self.px_len_y) - y).to(units.micron).value
                     y_ub = ((self.px_pitch_y * idy)                 - y).to(units.micron).value
-                    # note that y-bounds go first because dblquad expects the function to be f(y,x) not f(x,y)
-                    # but the psf we defined is psf(x,y)
-
-                    _x = np.linspace(x_lb,x_ub,100)
-                    _y = np.linspace(y_lb,y_ub,100)
+                    _y = np.linspace(y_lb, y_ub, ny)
+                    
                     count = i * np.trapezoid(np.trapezoid(lens.psf(*np.meshgrid(_x,_y)),_y,axis=0),_x,axis=0)
 
                     # if more precision is needed, can use dblquad (much slower!)
                     # note that y-bounds go first because dblquad expects the function to be f(y,x) not f(x,y)
                     # but the psf we defined is psf(x,y)
-                    # count = i * dblquad(lens.psf, y_lb, y_ub, x_lb, x_ub, epsabs=1e-1, epsrel=1e-1)[0]  # TODO: assess integration error?
+                    # count = i * dblquad(lens.psf, y_lb, y_ub, x_lb, x_ub, epsabs=1e-1, epsrel=1e-1)[0]
                     
                     self.pixels[idy,idx] += np.random.poisson(count.to(units.electron).value) * units.electron
                     
         return
         
 
+    @timer
     def _applyBloom(self):
 
         if not self.bloom:

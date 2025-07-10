@@ -104,13 +104,13 @@ def downloadAstroidKernels():
     _sbdbQuery(file_name='default', 
                orbit_class=default_small_body_groups, 
                Hmax=DEFAULT_SMALL_BODIES_HMAX, 
-               max_cache_age=0)
+               max_cache_age=DEFAULT_CACHE_EXPIRATION_DAYS)
 
     # kernels of default asteroids
     from .utils.horizons_query import horizonsQuery as _horizonsQuery
     global DEFAULT_SMALL_BODIES_KERNELS
     start_time = datetime(2010,1,1, tzinfo=UTC)
-    stop_time  = datetime(2050,1,1, tzinfo=UTC)
+    stop_time  = datetime(2049,1,1, tzinfo=UTC)
     DEFAULT_SMALL_BODIES_KERNELS = _horizonsQuery(start_time, stop_time, DEFAULT_SMALL_BODIES_PATH)
 
 
