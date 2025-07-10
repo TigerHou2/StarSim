@@ -32,7 +32,8 @@ def gaussianPSFModel(sigma):
     sigma = sigma.to(units.micron).value
     distr = multivariate_normal(mean=[0,0], cov=sigma)
     def gaussianPSF(x: Number, y: Number) -> float:
-        return distr.pdf(np.array([x,y]).T)
+        shape = x.shape
+        return distr.pdf(np.array([np.ravel(x),np.ravel(y)]).T).reshape(shape)
     return gaussianPSF
 
 
