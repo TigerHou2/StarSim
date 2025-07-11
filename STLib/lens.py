@@ -149,6 +149,39 @@ class Lens:
                         bounds /= 2
                     continue
 
-            
+
+    def showDistortion(self, **kwargs):
+
+        import matplotlib.pyplot as plt
+
+        num_rows = 100
+        num_cols = 100
+        col_step = 10
+        row_step = 10
+        _x = np.linspace(0,1,num_cols)
+        _y = np.linspace(0,1,num_rows)
+        X,Y = np.meshgrid(_x,_y)
+        Xd, Yd = self.applyDistortion(X,Y)
+
+        _, ax = plt.subplots(**kwargs)
+
+        # reference grid
+        for col in range(0, num_cols, col_step):
+            ax.plot(X[:,col], Y[:,col], c='k', alpha=0.3, lw=1)
+        for row in range(0, num_rows, row_step):
+            ax.plot(X[row,:], Y[row,:], c='k', alpha=0.3, lw=1)
+
+        # distorted grid
+        for col in range(0, num_cols, col_step):
+            ax.plot(Xd[:,col], Yd[:,col], c='k', lw=1.2)
+        for row in range(0, num_rows, row_step):
+            ax.plot(Xd[row,:], Yd[row,:], c='k', lw=1.2)
+        ax.set_aspect('equal')
+        ax.set_xlim([0,1])
+        ax.set_ylim([0,1])
+        ax.invert_yaxis()
+        ax.tick_params(top=True, labeltop=True, bottom=False, labelbottom=False)
+        plt.show()
+                    
 
 
