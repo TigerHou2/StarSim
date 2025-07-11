@@ -159,7 +159,6 @@ class SolarSystemSources:
             self.normalized_spectra.append(normalized_flux)
 
 
-
     def update(self, observer_id, time: Time):
         
         spice.furnsh([LEAPSECONDS_KERNEL, DE_KERNEL])
@@ -177,10 +176,9 @@ class SolarSystemSources:
             self.dec[idx] = dec * units.radian
             self.phase[idx] = spice.phaseq(et, targ, "Sun", observer_id, "LT+S") * units.radian
             self.dBO[idx] = _fnorm3(self.pos[idx,:])
-            self.dBS[idx] = _fnorm3(spice.spkezp(int(targ), et-lt, "J2000", "NONE", 10)[0]) * units.km
+            self.dBS[idx] = _fnorm3(spice.spkezp(int(targ), et-lt, "J2000", "LT+S", 10)[0]) * units.km
             spice.unload(self.kernels[idx])
 
-        self.magnitudes = None
         # https://en.wikipedia.org/wiki/Absolute_magnitude#Asteroids
         self.magnitudes = \
             self.H + 5 * np.log10(self.dBS * self.dBO / ((1*units.au).to(units.km))**2) - 2.5 * np.log10(_q(self.phase, self.G))

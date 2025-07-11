@@ -12,7 +12,7 @@ from .lens import Lens
 from .filter import Filter
 from .sensor import Sensor
 from .sources import AstronomicalSources, SpectralSources, MagnitudeSources, SolarSystemSources
-from .utils import type_checker, Number
+from .utils import type_checker, Number, timer
 from . import LEAPSECONDS_KERNEL, DE_KERNEL, JOHNSON_V_FILTER_PATH
 
 from typing import Union
@@ -79,11 +79,12 @@ class Camera:
         else:
             self._sources = sources
 
-        spice.furnsh(self._kernel)
-        for source in self._sources:
-            if isinstance(source, SolarSystemSources):
-                source.update(self._spkid, self._time)
-        spice.unload(self._kernel)
+        if self._time is not None:
+            spice.furnsh(self._kernel)
+            for source in self._sources:
+                if isinstance(source, SolarSystemSources):
+                    source.update(self._spkid, self._time)
+            spice.unload(self._kernel)
                 
         self.updateFlux()
 
