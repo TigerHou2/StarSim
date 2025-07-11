@@ -46,6 +46,11 @@ Path(SMALL_BODIES_SPECTRA_CACHE_DIR).mkdir(parents=True, exist_ok=True)
 Path(SMALL_BODIES_SBDB_CACHE_DIR).mkdir(parents=True, exist_ok=True)
 Path(SMALL_BODIES_KERNEL_CACHE_DIR).mkdir(parents=True, exist_ok=True)
 
+from .sensor import Sensor
+from .filter import Filter
+from .lens import Lens
+from .camera import Camera
+
 
 def downloadBasicData():
 
