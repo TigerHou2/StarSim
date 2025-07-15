@@ -1,3 +1,6 @@
+[![Unit Tests](https://github.com/TigerHou2/star-tracker-image-sim/actions/workflows/unit_test.yml/badge.svg?branch=main)](https://github.com/TigerHou2/star-tracker-image-sim/actions/workflows/unit_test.yml)
+[![codecov](https://codecov.io/github/TigerHou2/star-tracker-image-sim/branch/main/graph/badge.svg?token=S7B8ZHHLOR)](https://codecov.io/github/TigerHou2/star-tracker-image-sim)
+
 # Star Tracker Image Simulator
 
 This package simulates star tracker images of distant stars (and hopefully unresolved asteroids/planets in the future) given lens + sensor specifications and camera orientation. 
