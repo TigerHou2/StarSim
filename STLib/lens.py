@@ -2,7 +2,8 @@ from astropy import units
 import numpy as np
 
 from numpy.typing import ArrayLike
-from typing import Union, Callable
+from typing import Union
+from collections.abc import Callable
 
 from .utils import type_checker, Number
 
@@ -53,10 +54,11 @@ class Lens:
 
     @property
     def psf_bounds(self):
-        return (self.psf_bounds_x, self.psf_bounds_y)
+        return [self.psf_bounds_x, self.psf_bounds_y]
     @psf_bounds.setter
-    def psf_bounds(self, psf_bounds):
-        if isinstance(psf_bounds, tuple):
+    @type_checker
+    def psf_bounds(self, psf_bounds: units.Quantity):
+        if psf_bounds.size > 1:
             self.psf_bounds_x = psf_bounds[0].to(units.micron)
             self.psf_bounds_y = psf_bounds[1].to(units.micron)
         else:
@@ -91,7 +93,7 @@ class Lens:
         '''
         MIN_GRID_SIZE = 0.1  # microns
         bounds = 5  # microns, initial guess
-        grid = MIN_GRID_SIZE
+        grid = MIN_GRID_SIZE * 10
 
         bounds_lb = None
         bounds_ub = None
@@ -154,8 +156,8 @@ class Lens:
 
         import matplotlib.pyplot as plt
 
-        num_rows = 100
-        num_cols = 100
+        num_rows = 101
+        num_cols = 101
         col_step = 10
         row_step = 10
         _x = np.linspace(0,1,num_cols)

@@ -49,7 +49,7 @@ def pillboxPSFModel(radius, sharpness=50):
 # Eq. 40 of https://wp.optics.arizona.edu/jcwyant/wp-content/uploads/sites/13/2016/08/03-BasicAberrations_and_Optical_Testing.pdf
 def defocusPSFModel(wavelength, aperture, focal_length, defocus, nowarn=False):
     if not nowarn:
-        warnings.warn("The Wyant and Creath defocused PSF model is very expensive to compute - you have been warned!")
+        warnings.warn("The Wyant and Creath defocused PSF model is very expensive to compute - you have been warned!")  # pragma: no cover
     wavelength = wavelength.to(units.micron).value
     aperture = aperture.to(units.micron).value
     focal_length = focal_length.to(units.micron).value

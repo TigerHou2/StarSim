@@ -6,7 +6,8 @@ from scipy.signal import convolve2d
 from astropy import units
 
 from numpy.typing import ArrayLike
-from typing import Union, Callable
+from typing import Union
+from collections.abc import Callable
 from .utils import timer, type_checker, Number
 
 # create a new equivalency where 1 pA = 6.28e6 e-/s

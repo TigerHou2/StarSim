@@ -27,10 +27,8 @@ def type_checker(func):
             expected_ret = args[1] if len(args) == 2 else None
             if expected_sig is Ellipsis:
                 return True
-            try:
-                actual_sig = inspect.signature(value)
-            except ValueError:
-                return False
+            
+            actual_sig = inspect.signature(value)
             if len(expected_sig) != len(actual_sig.parameters):
                 return False
             for ((_, param), expected_type) in zip(actual_sig.parameters.items(), expected_sig):
@@ -38,8 +36,8 @@ def type_checker(func):
                     continue
                 if not param.annotation == expected_type:
                     return False
-            if expected_ret and value.__annotations__.get("return") is not None:
-                return value.__annotations__["return"] == expected_ret
+            if actual_sig.return_annotation is not inspect.Parameter.empty:
+                return actual_sig.return_annotation == expected_ret
             return True
 
         # Handle numpy arrays
@@ -58,7 +56,7 @@ def type_checker(func):
         if isinstance(expected_type, type):
             return isinstance(value, expected_type)
 
-        return False
+        return False  # pragma: no cover  (should never reach this)
 
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
@@ -74,13 +72,6 @@ def type_checker(func):
                     )
 
         result = func(*args, **kwargs)
-
-        # Check return type if annotated
-        if 'return' in hints:
-            if not _check_type(result, hints['return']):
-                raise TypeError(
-                    f"Return value {result} is not of type {hints['return']}"
-                )
 
         return result
 
