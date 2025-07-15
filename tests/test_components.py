@@ -2,11 +2,35 @@ import pytest
 import sys
 sys.path.append('.')
 
-from STLib.utils import type_checker, Number
+import STLib
+from STLib.utils import type_checker, Number, timer
 
 import astropy.units as u
 from typing import Union
 from collections.abc import Callable
+
+
+
+
+def test_timer_enable(mocker):
+    mock_print = mocker.patch("builtins.print")
+    @timer
+    def func(*args, **kwargs):
+        a = 2
+        return a**2
+    STLib.utils.debug.ENABLE_TIMER = True
+    func()
+    mock_print.assert_called_once()
+
+def test_timer_disable(mocker):
+    mock_print = mocker.patch("builtins.print")
+    @timer
+    def func(*args, **kwargs):
+        a = 2
+        return a**2
+    STLib.utils.debug.ENABLE_TIMER = False
+    func()
+    mock_print.assert_not_called()
 
 
 
@@ -87,6 +111,40 @@ def test_type_checker_func_as_arg():
     func_arb_call_signature(f)
 
 
+
+
+
+from STLib.utils import naifSchemaToExtended, naifSchemaToOriginal
+
+def test_naif_schema_upgrade():
+    with pytest.raises(ValueError, match="Expected integer string"):
+        naifSchemaToExtended("123abcd")
+    with pytest.raises(ValueError, match="Expected NAIF ID"):
+        naifSchemaToExtended("4000001")
+
+    with pytest.warns(UserWarning, match="already in"):
+        assert(naifSchemaToExtended("20002956") == "20002956")
+    with pytest.warns(UserWarning, match="already in"):
+        assert(naifSchemaToExtended("920065803") == "920065803")
+
+    assert(naifSchemaToExtended("2002956") == "20002956")
+    assert(naifSchemaToExtended("3000001") == "50000001")
+
+def test_naif_schema_downpgrade():
+    with pytest.raises(ValueError, match="Expected integer string"):
+        naifSchemaToOriginal("123abcde")
+    with pytest.raises(ValueError, match="Expected NAIF ID"):
+        naifSchemaToOriginal("10000001")
+    with pytest.raises(ValueError, match="cannot be accommodated"):
+        naifSchemaToOriginal("21000001")
+    with pytest.raises(ValueError, match="multi-body"):
+        naifSchemaToOriginal("920065803")
+
+    with pytest.warns(UserWarning, match="already in"):
+        assert(naifSchemaToOriginal("2002956") == "2002956")
+
+    assert(naifSchemaToOriginal("20002956") == "2002956")
+    assert(naifSchemaToOriginal("50000001") == "3000001")
 
 
 
