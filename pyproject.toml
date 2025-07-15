@@ -1,0 +1,28 @@
+[project]
+name = "StarSim"
+description = "Star Tracker Image Simulator"
+authors = [{ name = "Tiger Hou" }]
+readme = "README.md"
+requires-python = ">=3.8"
+dependencies = [
+    "numpy",
+    "scipy",
+    "astropy",
+    "matplotlib"
+]
+
+dynamic = ["version"]
+
+[project.optional-dependencies]
+test = [
+    "pytest",
+    "coverage"
+]
+
+[build-system]
+requires = ["setuptools>=61", "setuptools-scm"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools_scm]
+version_scheme = "post-release"
+local_scheme = "node-and-date"
