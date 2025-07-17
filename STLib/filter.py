@@ -15,8 +15,8 @@ class Filter:
     def __init__(self, *, 
                  zp_flux        : units.Quantity,
                  file           : Union[str, None] = None,
-                 eff_wavelength : Union[Number, None] = None,
-                 fwhm           : Union[Number, None] = None):
+                 eff_wavelength : Union[units.Quantity, None] = None,
+                 fwhm           : Union[units.Quantity, None] = None):
         
         '''
         The filter can be defined either by:
@@ -31,9 +31,9 @@ class Filter:
             - W / nm / m^2 or equivalent.
         '''
 
-        self.zp_flux = zp_flux
+        self.zp_flux = zp_flux.to(units.W/units.nm/units.m**2)
 
-        if file:
+        if file is not None:
 
             if file.lower().endswith(".xml"):
 
@@ -63,16 +63,21 @@ class Filter:
             max_transmission = np.max(self.transmission)
             fwhm_indices = np.where(self.transmission > max_transmission/2)[0]
             self.fwhm = self.wavelengths[fwhm_indices[-1]] - self.wavelengths[fwhm_indices[0]]
-            self.eff_wavelength = np.trapezoid(self.wavelengths * self.transmission, self.wavelengths) / np.trapezoid(self.transmission, self.wavelengths)
+            self.eff_wavelength = np.trapezoid(self.wavelengths * self.transmission, self.wavelengths) \
+                                / np.trapezoid(self.transmission, self.wavelengths)
 
-        elif eff_wavelength and fwhm:
+        elif eff_wavelength is not None and fwhm is not None:
 
-            eff_wavelength = eff_wavelength.to(units.nm)
-            fwhm = fwhm.to(units.nm)
-            self.eff_wavelength = eff_wavelength
-            self.fwhm = fwhm
-            self.wavelengths = np.array([eff_wavelength - fwhm/2, eff_wavelength + fwhm/2])
+            self.eff_wavelength = eff_wavelength.to_value(units.nm)
+            self.fwhm = fwhm.to_value(units.nm)
+            self.wavelengths = np.array([self.eff_wavelength - self.fwhm/2, self.eff_wavelength + self.fwhm/2]) * units.nm
             self.transmission = np.array([1.0, 1.0])
+
+        else:
+
+            raise ValueError("Please specify a transmission profile either by "
+                             "the file path to a VOTable/two-column ASCII table OR "
+                             "an effective wavelength and FWHM.")
 
 
 

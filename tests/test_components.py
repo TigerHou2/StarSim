@@ -287,6 +287,61 @@ def test_lens_plotting(mocker, psf):
 
 
 
+from astropy.table import Table
 from STLib import Filter, Sensor, Camera
 from STLib.sources import AstronomicalSources, MagnitudeSources, SpectralSources, SolarSystemSources
 
+@pytest.fixture
+def zp_flux():
+    return 1.0e-9 * u.erg / u.cm**2 / u.s / u.angstrom
+
+def test_filter_init_with_fwhm(zp_flux):
+    eff_wavelength = 5e-7 * u.m
+    fwhm = 100 * u.nm
+    filter_ = Filter(zp_flux=zp_flux, eff_wavelength=eff_wavelength, fwhm=fwhm)
+    np.testing.assert_allclose(filter_.wavelengths, [450,550] * u.nm)
+    np.testing.assert_allclose(filter_.transmission, [1., 1.] * u.dimensionless_unscaled)
+
+def test_filter_init_with_votable(mocker, zp_flux):
+    mock_table = Table({
+        "Wavelength": [4000, 5000, 6000] * u.Angstrom,
+        "Transmission": [0.3, 0.8, 0.2] * u.dimensionless_unscaled
+    })
+    dummy_path = "tab.xml"
+    mock_table_element = mocker.patch("astropy.io.votable.parse_single_table")
+    mock_table_element.return_value.to_table.return_value = mock_table
+    filter_ = Filter(zp_flux=zp_flux, file=dummy_path)
+    np.testing.assert_allclose(filter_.wavelengths, [400,500,600] * u.nm)
+    np.testing.assert_allclose(filter_.transmission, [0.3, 0.8, 0.2] * u.dimensionless_unscaled)
+
+def test_filter_init_with_ascii(mocker, zp_flux):
+    # with column headers
+    mock_table = Table({
+        "Wavelength": [4000, 5000, 6000],
+        "Transmission": [0.3, 0.8, 0.2]
+    })
+    dummy_path = "tab.csv"
+    mocker_read = mocker.patch("astropy.io.ascii.read")
+    mocker_read.return_value = mock_table
+    filter_ = Filter(zp_flux=zp_flux, file=dummy_path)
+    np.testing.assert_allclose(filter_.wavelengths, [400,500,600] * u.nm)
+    np.testing.assert_allclose(filter_.transmission, [0.3, 0.8, 0.2] * u.dimensionless_unscaled)
+
+    # without column headers
+    mock_table = Table({
+        "col1": [4000, 5000, 6000],
+        "col2": [0.3, 0.8, 0.2]
+    })
+    mocker_read.return_value = mock_table
+    filter_ = Filter(zp_flux=zp_flux, file=dummy_path)
+    np.testing.assert_allclose(filter_.wavelengths, [400,500,600] * u.nm)
+    np.testing.assert_allclose(filter_.transmission, [0.3, 0.8, 0.2] * u.dimensionless_unscaled)
+
+def test_filter_init_with_bad_file_ext(zp_flux):
+    dummy_path = "tab.badext"
+    with pytest.raises(ValueError, match="are supported"):
+        filter_ = Filter(zp_flux=zp_flux, file=dummy_path)
+
+def test_filter_init_incomplete(zp_flux):
+    with pytest.raises(ValueError, match="Please specify"):
+        filter_ = Filter(zp_flux=zp_flux)
