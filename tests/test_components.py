@@ -212,6 +212,10 @@ def test_psf_defocused():
 
 from STLib import Lens
 
+@pytest.fixture
+def psf():
+    return gaussianPSFModel(sigma=3*u.micron)
+
 def test_lens_autotune():
     psf = gaussianPSFModel(sigma=10*u.micron)
     lens = Lens(aperture=1*u.cm, focal_length=1*u.cm, transmission_efficiency=1.0, psf=psf, 
@@ -219,17 +223,15 @@ def test_lens_autotune():
     lens.focal_length=3*u.cm
     lens.tuneIntegrationParams(atol=1e-4, rtol=1e-4)
 
-def test_lens_rw_params():
-    psf = gaussianPSFModel(sigma=3*u.micron)
+def test_lens_rw_params(psf):
     lens = Lens(aperture=1*u.cm, focal_length=1*u.cm, transmission_efficiency=1.0, psf=psf, 
-                auto_tune_integration_params=True)
-    lens.psf_bounds = 10 * u.micron
+                auto_tune_integration_params=False, psf_bounds=10*u.micron, psf_resolution=1*u.micron)
+    lens.psf_bounds = 20 * u.micron
     lens.psf_bounds = np.array([10,10]) * u.micron
     psf_bounds_x, psf_bounds_y = lens.psf_bounds
     assert isinstance(psf_bounds_x, u.Quantity) and isinstance(psf_bounds_y, u.Quantity)
     
-def test_lens_autotune_off_error():
-    psf = gaussianPSFModel(sigma=3*u.micron)
+def test_lens_autotune_off_error(psf):
     with pytest.raises(ValueError):
         lens = Lens(aperture=1*u.cm, focal_length=1*u.cm, transmission_efficiency=1.0, psf=psf, 
                     auto_tune_integration_params=False)
@@ -240,13 +242,7 @@ def test_lens_autotune_off_error():
         lens = Lens(aperture=1*u.cm, focal_length=1*u.cm, transmission_efficiency=1.0, psf=psf, 
                     auto_tune_integration_params=False, psf_resolution=1*u.micron)
 
-def test_lens_autotune_off():
-    psf = gaussianPSFModel(sigma=3*u.micron)
-    lens = Lens(aperture=1*u.cm, focal_length=1*u.cm, transmission_efficiency=1.0, psf=psf, 
-                auto_tune_integration_params=False, psf_bounds=10*u.micron, psf_resolution=1*u.micron)
-
-def test_lens_center():
-    psf = gaussianPSFModel(sigma=3*u.micron)
+def test_lens_center(psf):
     lens = Lens(aperture=1*u.cm, focal_length=1*u.cm, transmission_efficiency=1.0, psf=psf,
                 k1=0.1, k2=0.1, k3=0.1, k4=0.01, k5=0.01, k6=0.01)
     x = np.array([0.5])
@@ -254,16 +250,14 @@ def test_lens_center():
     xd, yd = lens.applyDistortion(x,y)
     assert xd[0] == 0.5 and yd[0] == 0.5, "Lens center should not change under distortion."
 
-def test_lens_flat():
-    psf = gaussianPSFModel(sigma=3*u.micron)
+def test_lens_flat(psf):
     lens = Lens(aperture=1*u.cm, focal_length=1*u.cm, transmission_efficiency=1.0, psf=psf)
     x, y = np.meshgrid(np.linspace(0,1,3), np.linspace(0,1,3))
     xd, yd = lens.applyDistortion(x,y)
     np.testing.assert_array_almost_equal(x, xd)
     np.testing.assert_array_almost_equal(y, yd)
 
-def test_lens_barrel_distortion():
-    psf = gaussianPSFModel(sigma=3*u.micron)
+def test_lens_barrel_distortion(psf):
     lens = Lens(aperture=1*u.cm, focal_length=1*u.cm, transmission_efficiency=1.0, psf=psf, k1=-0.1)
     x = np.linspace(0, 1, 5)
     y = np.ones(5) * 0.75
@@ -271,8 +265,7 @@ def test_lens_barrel_distortion():
     np.testing.assert_array_equal(np.diff(yd) > 0, [True, True, False, False])
     np.testing.assert_array_equal(np.diff(np.diff(yd)) > 0, [False, False, False])
 
-def test_lens_pincushion_distortion():
-    psf = gaussianPSFModel(sigma=3*u.micron)
+def test_lens_pincushion_distortion(psf):
     lens = Lens(aperture=1*u.cm, focal_length=1*u.cm, transmission_efficiency=1.0, psf=psf, k1=0.1)
     x = np.linspace(0, 1, 5)
     y = np.ones(5) * 0.75
@@ -280,11 +273,10 @@ def test_lens_pincushion_distortion():
     np.testing.assert_array_equal(np.diff(yd) > 0, [False, False, True, True])
     np.testing.assert_array_equal(np.diff(np.diff(yd)) > 0, [True, True, True])
 
-def test_lens_plotting(mocker):
+def test_lens_plotting(mocker, psf):
     mock_ax = mocker.Mock()
     mock_show = mocker.patch("matplotlib.pyplot.show")
     mocker.patch("matplotlib.pyplot.subplots", return_value=(None, mock_ax))
-    psf = gaussianPSFModel(sigma=3*u.micron)
     lens = Lens(aperture=1*u.cm, focal_length=1*u.cm, transmission_efficiency=1.0, psf=psf,
                 k1=0.1, k2=-0.1, k3=-0.1, k4=0.01, k5=-0.01, k6=0.01, p1=0.02, p2=-0.02)
     lens.showDistortion()
