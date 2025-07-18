@@ -1,0 +1,22 @@
+title: StarSim
+# email: your-email@example.com
+description: >-
+  StarSim: a Python package for simulating star tracker images of stars and Solar System bodies. 
+baseurl: ""
+url: ""
+
+# Build settings
+theme: just-the-docs
+plugins:
+
+defaults:
+  - scope:
+      path: "docs"
+      type: "pages"
+    values:
+      layout: "default"
+
+exclude:
+  # from https://github.com/jekyll/jekyll/blob/master/lib/site_template/_config.yml:
+  - Gemfile
+  - Gemfile.lock

@@ -22,6 +22,10 @@ test = [
     "pytest-mock",
     "coverage"
 ]
+doc = [
+    "jupyter",
+    "nbconvert"
+]
 
 [build-system]
 requires = ["setuptools>=61", "setuptools-scm"]
