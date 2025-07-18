@@ -36,7 +36,7 @@ jobs:
 
       - name: Execute notebook
         run: |
-          jupyter nbconvert --to html --execute examples/osiris-rex.ipynb --output examples/osiris-rex.html
+          jupyter nbconvert --to html --execute examples/osiris-rex.ipynb --output ./osiris-rex.html
           touch docs/.nojekyll
           python docs/postprocess.py
 
