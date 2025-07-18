@@ -3,6 +3,9 @@ name: Build Notebooks
 on:
   push:
     branches: [ "**" ]
+    paths-ignore: 
+      - "data/**"
+      - "docs/**"
   pull_request:
     branches: [ main ]
 
@@ -33,6 +36,12 @@ jobs:
 
       - name: Execute notebook
         run: |
-          jupyter nbconvert --to html --execute examples/osiris-rex.ipynb --output ../docs/assets/osiris-rex.html
+          jupyter nbconvert --to html --execute examples/osiris-rex.ipynb --output examples/osiris-rex.html
           touch docs/.nojekyll
           python docs/postprocess.py
+
+      - name: Upload notebook artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: notebooks
+          path: examples/*.html
