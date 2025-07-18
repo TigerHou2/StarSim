@@ -3,8 +3,16 @@ name: Unit Tests
 on:
   push:
     branches: [ main ]
+    paths-ignore: 
+      - "data/**"
+      - "docs/**"
+      - "examples/**"
   pull_request:
     branches: [ main ]
+    paths-ignore: 
+      - "data/**"
+      - "docs/**"
+      - "examples/**"
 
 jobs:
   test:
