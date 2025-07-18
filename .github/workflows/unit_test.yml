@@ -2,17 +2,17 @@ name: Unit Tests
 
 on:
   push:
-    branches: [ main ]
-    paths-ignore: 
-      - "data/**"
-      - "docs/**"
-      - "examples/**"
+    branches: [ "**" ]
+    paths:
+      - "STLib/**"
+      - "tests/**"
+      - ".github/workflows/unit_test.yml"
   pull_request:
     branches: [ main ]
-    paths-ignore: 
-      - "data/**"
-      - "docs/**"
-      - "examples/**"
+    paths:
+      - "STLib/**"
+      - "tests/**"
+      - ".github/workflows/unit_test.yml"
 
 jobs:
   test:

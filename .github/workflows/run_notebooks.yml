@@ -3,11 +3,16 @@ name: Build Notebooks
 on:
   push:
     branches: [ "**" ]
-    paths-ignore: 
-      - "data/**"
-      - "docs/**"
+    paths: 
+      - "examples/**"
+      - "docs/postprocess.py"
+      - ".github/workflows/run_notebooks.yml"
   pull_request:
     branches: [ main ]
+    paths: 
+      - "examples/**"
+      - "docs/postprocess.py"
+      - ".github/workflows/run_notebooks.yml"
 
 jobs:
   run-notebook:
