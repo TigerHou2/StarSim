@@ -6,7 +6,7 @@ script_dir = os.path.dirname(os.path.abspath(__file__))
 target_line = '<div class="cm-editor cm-s-jupyter">'
 replacement_line = '<div class="cm-editor cm-s-jupyter" style="overflow-x: scroll;">'
 
-for root, _, files in os.walk(os.path.join(script_dir, "assets")):
+for root, _, files in os.walk(os.path.join(script_dir, "../examples")):
     for file in files:
         if file.endswith(".html"):
             file_path = os.path.join(root, file)
