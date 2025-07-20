@@ -4,7 +4,7 @@ import tarfile
 import io
 import os
 from pathlib import Path
-from datetime import datetime, UTC
+from astropy.time import Time
 
 # TODO: put these into a dedicated `settings` module?
 
@@ -114,8 +114,8 @@ def downloadAstroidKernels():
     # kernels of default asteroids
     from .utils.horizons_query import horizonsQuery as _horizonsQuery
     global DEFAULT_SMALL_BODIES_KERNELS
-    start_time = datetime(2010,1,1, tzinfo=UTC)
-    stop_time  = datetime(2049,1,1, tzinfo=UTC)
+    start_time = Time("2010-01-01", scale="tdb")
+    stop_time  = Time("2049-01-01", scale="tdb")
     DEFAULT_SMALL_BODIES_KERNELS = _horizonsQuery(start_time, stop_time, DEFAULT_SMALL_BODIES_PATH)
 
 

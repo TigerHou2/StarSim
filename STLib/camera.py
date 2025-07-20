@@ -207,7 +207,7 @@ class Camera:
         
         spice.furnsh([LEAPSECONDS_KERNEL, DE_KERNEL, self._kernel])
 
-        et = spice.datetime2et(time.to_datetime())
+        et = spice.str2et(time.tdb.strftime("%Y-%m-%d %H:%M:%S TDB"))
         state = spice.spkezr(self._spkid, et, "J2000", "NONE", "SSB")[0]
         self._pos = state[:3] * units.km
         self._vel = state[3:] * units.km / units.s

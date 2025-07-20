@@ -6,7 +6,6 @@ from typing import Union
 from numpy.typing import ArrayLike
 from astropy import units
 from astropy.time import Time
-from datetime import datetime
 from .utils import type_checker, Number, horizonsQuery, naifSchemaToExtended, naifSchemaToOriginal
 from . import \
     DEFAULT_SMALL_BODIES_PATH, DEFAULT_CACHE_EXPIRATION_DAYS, \
@@ -80,8 +79,8 @@ class SolarSystemSources:
 
     @type_checker
     def __init__(self, *,
-                 start_date: datetime,
-                 end_date: datetime, 
+                 start_date: Time,
+                 end_date: Time, 
                  small_bodies_query_results: str = DEFAULT_SMALL_BODIES_PATH,
                  max_cache_age: Number = DEFAULT_CACHE_EXPIRATION_DAYS):
         
@@ -164,7 +163,7 @@ class SolarSystemSources:
         spice.furnsh([LEAPSECONDS_KERNEL, DE_KERNEL])
 
         self.time = time
-        et = spice.datetime2et(time.to_datetime())
+        et = spice.str2et(time.tdb.strftime("%Y-%m-%d %H:%M:%S TDB"))
 
         for idx, targ in enumerate(self.spkids):
             spice.furnsh(self.kernels[idx])

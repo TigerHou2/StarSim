@@ -6,14 +6,15 @@ import csv
 import os.path
 import time
 import spiceypy as spice
+from astropy.time import Time
 
 from .. import SMALL_BODIES_KERNEL_CACHE_DIR, DEFAULT_CACHE_EXPIRATION_DAYS, LEAPSECONDS_KERNEL, DE_KERNEL
 
 
-def horizonsQuery(start_time, stop_time, sbdb_path, max_cache_age=DEFAULT_CACHE_EXPIRATION_DAYS):
+def horizonsQuery(start_time: Time, stop_time: Time, sbdb_path: str, max_cache_age=DEFAULT_CACHE_EXPIRATION_DAYS):
 
-    # download small body SPICE kernels and merge the resulting .bsp files together.
-    # individual kernels are first placed into an artifact cache.
+    start_time = start_time.tdb.strftime("%Y-%m-%d %H:%M:%S TDB")
+    stop_time  =  stop_time.tdb.strftime("%Y-%m-%d %H:%M:%S TDB")
 
     kernels = []
 
@@ -41,11 +42,11 @@ def horizonsQuery(start_time, stop_time, sbdb_path, max_cache_age=DEFAULT_CACHE_
                 spice.furnsh(kernel)
                 spkid = spice.spkobj(kernel)[0]
                 coverage = spice.spkcov(kernel, spkid)
-                cov_start = spice.et2datetime(coverage[0])
-                cov_end   = spice.et2datetime(coverage[-1])
+                cov_start = coverage[0]
+                cov_end   = coverage[-1]
                 spice.unload(kernel)
 
-                if cov_start <= start_time and stop_time <= cov_end:
+                if cov_start <= spice.str2et(start_time) and spice.str2et(stop_time) <= cov_end:
                     kernels.append(kernel)
                     continue
 
@@ -59,7 +60,7 @@ def horizonsQuery(start_time, stop_time, sbdb_path, max_cache_age=DEFAULT_CACHE_
             #            Horizons COMMAND parameter specification.
             url += "?format=json&EPHEM_TYPE=SPK&OBJ_DATA=NO"
             url += "&COMMAND='DES%3D{}%3B'&START_TIME='{}'&STOP_TIME='{}'".format( \
-                spkid, start_time.date().strftime("%Y-%m-%d"), stop_time.date().strftime("%Y-%m-%d"))
+                spkid, start_time, stop_time)
 
             # Submit the API request and decode the JSON-response:
             response = requests.get(url)
