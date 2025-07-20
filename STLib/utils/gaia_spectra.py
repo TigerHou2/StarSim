@@ -9,7 +9,7 @@ import os.path
 from .. import GAIA_CACHE_DIR, DEFAULT_CACHE_EXPIRATION_DAYS
 
 
-def spectraConeSearch(ra, dec, radius, mag_cutoff, cache=False, max_cache_age=DEFAULT_CACHE_EXPIRATION_DAYS):
+def spectraConeSearch(ra, dec, radius, mag_cutoff, cache=False, max_cache_age=DEFAULT_CACHE_EXPIRATION_DAYS, suppress=False):
 
     _ra     = ra.to(units.degree).value
     _dec    = dec.to(units.degree).value
@@ -57,16 +57,19 @@ def spectraConeSearch(ra, dec, radius, mag_cutoff, cache=False, max_cache_age=DE
         query_flag = True
 
     if not query_flag:
-        print(f"Using cached results from {fname} .")
+        if not suppress:
+            print(f"Using cached results from {fname} .")
         results = Table.read(fname)
     else:
-        print("Performing TAP query to https://gaia.aip.de/tap ...")
+        if not suppress:
+            print("Performing TAP query to https://gaia.aip.de/tap ...")
         tap_service = pyvo.dal.TAPService("https://gaia.aip.de/tap")
 
         job = tap_service.submit_job(query, queue="30s")
         job.run()
         job.wait(phases=["COMPLETED", "ERROR", "ABORTED"], timeout=30.0)
-        print('JOB %s: %s' % (job.job.runid, job.phase))
+        if not suppress:
+            print('JOB %s: %s' % (job.job.runid, job.phase))
         job.raise_if_error()
 
         # there seems to be a disconnect between what pyvo expects and what the gaia aip TAP provides for identifying VOTables
@@ -82,7 +85,8 @@ def spectraConeSearch(ra, dec, radius, mag_cutoff, cache=False, max_cache_age=DE
                 results.columns[ii].unit = units.Unit(results.columns[ii].unit._names[0].replace('**',''))
         if cache:
             results.write(fname, format="votable", overwrite=True)
-            print(f"Search results cached to {fname} .")
+            if not suppress:
+                print(f"Search results cached to {fname} .")
 
     # split the results into two groups:
     # stars with spectra

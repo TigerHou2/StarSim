@@ -11,7 +11,7 @@ from astropy.time import Time
 from .. import SMALL_BODIES_KERNEL_CACHE_DIR, DEFAULT_CACHE_EXPIRATION_DAYS, LEAPSECONDS_KERNEL, DE_KERNEL
 
 
-def horizonsQuery(start_time: Time, stop_time: Time, sbdb_path: str, max_cache_age=DEFAULT_CACHE_EXPIRATION_DAYS):
+def horizonsQuery(start_time: Time, stop_time: Time, sbdb_path: str, max_cache_age=DEFAULT_CACHE_EXPIRATION_DAYS, suppress=False):
 
     start_time = start_time.tdb.strftime("%Y-%m-%d %H:%M:%S TDB")
     stop_time  =  stop_time.tdb.strftime("%Y-%m-%d %H:%M:%S TDB")
@@ -50,7 +50,8 @@ def horizonsQuery(start_time: Time, stop_time: Time, sbdb_path: str, max_cache_a
                     kernels.append(kernel)
                     continue
 
-            print(f"\rDownloading kernel {counter}/{len(spkids)}...", end='')
+            if not suppress:
+                print(f"\rDownloading kernel {counter}/{len(spkids)}...", end='')
 
             # Define API URL and SPK filename:
             url = 'https://ssd.jpl.nasa.gov/api/horizons.api'

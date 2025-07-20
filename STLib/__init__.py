@@ -3,6 +3,7 @@ import requests
 import tarfile
 import io
 import os
+import time
 from pathlib import Path
 from astropy.time import Time
 
@@ -50,28 +51,35 @@ from .sensor import Sensor
 from .filter import Filter
 from .lens import Lens
 from .camera import Camera
+from .utils import type_checker, Number
 
 
-def downloadBasicData():
+@type_checker
+def downloadBasicData(suppress: bool = False):
 
     # core SPICE kernels
-    print("Downloading SPICE kernels...")
-    _download("https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/planets/de440s.bsp", DE_KERNEL)
-    _download("https://naif.jpl.nasa.gov/pub/naif/generic_kernels/pck/gm_de440.tpc", GM_KERNEL)
-    _download(lsk_url, LEAPSECONDS_KERNEL)
+    if not suppress:
+        print("Downloading core SPICE kernels...")
+    _download("https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/planets/de440s.bsp", DE_KERNEL, suppress=suppress)
+    _download("https://naif.jpl.nasa.gov/pub/naif/generic_kernels/pck/gm_de440.tpc", GM_KERNEL, suppress=suppress)
+    _download(lsk_url, LEAPSECONDS_KERNEL, suppress=suppress)
 
     # asteroid-related
-    downloadAsteroidSpectra()
-    downloadAstroidKernels()
+    downloadAsteroidSpectra(suppress=suppress)
+    downloadAstroidKernels(suppress=suppress)
 
     # filters
-    _download("https://svo2.cab.inta-csic.es/theory/fps/fps.php?ID=Generic/Johnson.V", JOHNSON_V_FILTER_PATH)
+    if not suppress:
+        print("Downloading core filter transmission curves...")
+    _download("https://svo2.cab.inta-csic.es/theory/fps/fps.php?ID=Generic/Johnson.V", JOHNSON_V_FILTER_PATH, suppress=suppress)
 
 
-def downloadAsteroidSpectra():
+@type_checker
+def downloadAsteroidSpectra(suppress: bool = False):
 
     # asteroid spectra
-    print("Downloading asteroid spectra...")
+    if not suppress:
+        print("Downloading asteroid spectra...")
     url_smass1 = "http://smass.mit.edu/data/smass/smass1data_new.tar.gz"
     url_smass2 = "http://smass.mit.edu/data/smass/smass2data.tar.gz"
     _download_and_extract(url_smass1, SMALL_BODIES_SPECTRA_CACHE_DIR)
@@ -96,12 +104,14 @@ def downloadAsteroidSpectra():
                   os.path.join(SMALL_BODIES_SPECTRA_CACHE_DIR, "smass2", "a"+f"{perm_id:>06}"+".spfit.[2]"))
 
     # asteroid mean spectra templates
-    print("Downloading asteroid mean spectra templates...")
+    if not suppress:
+        print("Downloading asteroid mean spectra templates...")
     url_mean_spectra = "https://sbnarchive.psi.edu/pds4/non_mission/ast.bus-demeo.taxonomy/data/meanspectra.tab"
-    _download(url_mean_spectra, SMALL_BODIES_MEAN_SPECTRA_PATH)
+    _download(url_mean_spectra, SMALL_BODIES_MEAN_SPECTRA_PATH, suppress=suppress)
 
 
-def downloadAstroidKernels():
+@type_checker
+def downloadAstroidKernels(suppress: bool = False):
 
     # default population of asteroids
     from .utils.sbdb_query import sbdbQuery as _sbdbQuery
@@ -109,25 +119,36 @@ def downloadAstroidKernels():
     _sbdbQuery(file_name='default', 
                orbit_class=default_small_body_groups, 
                Hmax=DEFAULT_SMALL_BODIES_HMAX, 
-               max_cache_age=DEFAULT_CACHE_EXPIRATION_DAYS)
+               max_cache_age=DEFAULT_CACHE_EXPIRATION_DAYS,
+               suppress=suppress)
 
     # kernels of default asteroids
+    if not suppress:
+        print("Downloading asteroid kernels...")
     from .utils.horizons_query import horizonsQuery as _horizonsQuery
     global DEFAULT_SMALL_BODIES_KERNELS
     start_time = Time("2010-01-01", scale="tdb")
     stop_time  = Time("2049-01-01", scale="tdb")
-    DEFAULT_SMALL_BODIES_KERNELS = _horizonsQuery(start_time, stop_time, DEFAULT_SMALL_BODIES_PATH)
+    DEFAULT_SMALL_BODIES_KERNELS = _horizonsQuery(start_time, stop_time, DEFAULT_SMALL_BODIES_PATH, suppress=suppress)
 
 
-
-def _download_and_extract(url, destination):
+@type_checker
+def _download_and_extract(url: str, destination: str):
     response = requests.get(url)
     response.raise_for_status()
     with tarfile.open(fileobj=io.BytesIO(response.content), mode="r:gz") as tar:
         tar.extractall(destination, filter="data")
 
 
-def _download(url, destination):
+@type_checker
+def _download(url: str, 
+              destination: str, 
+              max_cache_age: Number = DEFAULT_CACHE_EXPIRATION_DAYS, 
+              suppress: bool = False):
+    if os.path.isfile(destination) and (time.time() - os.path.getmtime(destination)) < max_cache_age * 86400:
+        if not suppress:
+            print(f"Using cached version of {url} at {destination}.")
+        return
     with requests.get(url, stream=True) as response:
         response.raise_for_status()
         with open(destination, "wb") as f:

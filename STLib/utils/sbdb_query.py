@@ -17,7 +17,8 @@ def sbdbQuery(orbit_class,
               fields=[], 
               Hmax=None, 
               constraints=None, 
-              max_cache_age=DEFAULT_CACHE_EXPIRATION_DAYS):
+              max_cache_age=DEFAULT_CACHE_EXPIRATION_DAYS,
+              suppress=False):
 
     # construct query
 
@@ -50,12 +51,14 @@ def sbdbQuery(orbit_class,
     # do SBDB query unless file exists and hasn't expired
     if os.path.isfile(fname) and (time.time() - os.path.getmtime(fname)) < max_cache_age * 86400:
 
-        print("Using cached results for SBDB query.")
+        if not suppress:
+            print("Using cached results for SBDB query.")
     
     else:
 
         # Submit the API request and decode the JSON-response:
-        print("Performing SBDB query...")
+        if not suppress:
+            print("Performing SBDB query...")
 
         response = requests.get(url)
         try:

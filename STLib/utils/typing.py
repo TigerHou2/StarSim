@@ -54,6 +54,8 @@ def type_checker(func):
 
         # Handle regular type
         if isinstance(expected_type, type):
+            if expected_type is int:
+                return type(value) == int  # bool is a subclass of int -- yuck!
             return isinstance(value, expected_type)
 
         return False  # pragma: no cover  (should never reach this)
