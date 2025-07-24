@@ -3,7 +3,7 @@ name = "StarSim"
 description = "Star Tracker Image Simulator"
 authors = [{ name = "Tiger Hou" }]
 readme = "README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.9"
 dependencies = [
     "numpy",
     "scipy",
@@ -23,7 +23,11 @@ test = [
     "coverage"
 ]
 doc = [
-    "jupyter",
+    "ipykernel",
+    "numpydoc",
+    "sphinx",
+    "pydata-sphinx-theme",
+    "nbsphinx",
     "nbconvert"
 ]
 

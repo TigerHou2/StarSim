@@ -7,12 +7,14 @@ on:
       - "STLib/**"
       - "tests/**"
       - ".github/workflows/unit_test.yml"
+      - "pyproject.toml"
   pull_request:
     branches: [ main ]
     paths:
       - "STLib/**"
       - "tests/**"
       - ".github/workflows/unit_test.yml"
+      - "pyproject.toml"
 
 jobs:
   test:
