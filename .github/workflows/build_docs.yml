@@ -57,6 +57,11 @@ jobs:
           python -m pip install --upgrade pip
           pip install .[doc]
 
+      - name: Install pandoc
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pandoc
+
       - name: Sphinx build
         run: |
           sphinx-build -M html docs/source docs/build

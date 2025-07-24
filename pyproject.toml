@@ -28,8 +28,7 @@ doc = [
     "sphinx",
     "pydata-sphinx-theme",
     "nbsphinx",
-    "nbconvert",
-    "pandoc"
+    "nbconvert"
 ]
 
 [build-system]
