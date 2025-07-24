@@ -166,9 +166,9 @@ def test_psf_pillbox():
     assert integral_error < 1e-5, f"Expected 1 (± 1e-5), got error of {integral_error}"
 
 def test_psf_gaussian():
-    psf = gaussianPSFModel(sigma=3*u.micron)
+    psf = gaussianPSFModel(cov=(3*u.micron)**2)
 
-    bounds = 10
+    bounds = 18
     grid = 100
     _x = np.linspace(-bounds,bounds,grid)
     _y = np.linspace(-bounds,bounds,grid)
@@ -214,10 +214,10 @@ from STLib import Lens
 
 @pytest.fixture
 def psf():
-    return gaussianPSFModel(sigma=3*u.micron)
+    return gaussianPSFModel(cov=(3*u.micron)**2)
 
 def test_lens_autotune():
-    psf = gaussianPSFModel(sigma=10*u.micron)
+    psf = gaussianPSFModel(cov=(10*u.micron)**2)
     lens = Lens(aperture=1*u.cm, focal_length=1*u.cm, transmission_efficiency=1.0, psf=psf, 
                 auto_tune_integration_params=True)
     lens.focal_length=3*u.cm

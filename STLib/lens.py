@@ -49,7 +49,7 @@ class Lens:
             raise ValueError("If auto_tune_integration_params == False, you must specify the PSF bounds of"
                              "integration and grid resolution for integration. ")
     
-        self.psd_bounds = psf_bounds
+        self.psf_bounds = psf_bounds
         self.psf_resolution = psf_resolution
 
     @property

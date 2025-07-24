@@ -28,9 +28,9 @@ def airyPSFModel(wavelength, aperture, focal_length):
     return airyPSF
 
 
-def gaussianPSFModel(sigma):
-    sigma = sigma.to(units.micron).value
-    distr = multivariate_normal(mean=[0,0], cov=sigma)
+def gaussianPSFModel(cov):
+    cov = cov.to(units.micron**2).value
+    distr = multivariate_normal(mean=[0,0], cov=cov)
     def gaussianPSF(x: Number, y: Number) -> float:
         shape = x.shape
         return distr.pdf(np.array([np.ravel(x),np.ravel(y)]).T).reshape(shape)
@@ -47,16 +47,23 @@ def pillboxPSFModel(radius, sharpness=50):
 
 # https://www.strollswithmydog.com/a-simple-model-for-sharpness-in-digital-cameras-defocus/
 # Eq. 40 of https://wp.optics.arizona.edu/jcwyant/wp-content/uploads/sites/13/2016/08/03-BasicAberrations_and_Optical_Testing.pdf
-def defocusPSFModel(wavelength, aperture, focal_length, defocus, nowarn=False):
+def defocusPSFModel(wavelength, aperture, focal_length, defocus, legendre_deg=50, nowarn=False):
     if not nowarn:
         warnings.warn("The Wyant and Creath defocused PSF model is very expensive to compute - you have been warned!")  # pragma: no cover
     wavelength = wavelength.to(units.micron).value
     aperture = aperture.to(units.micron).value
     focal_length = focal_length.to(units.micron).value
     defocus = defocus.to(units.micron).value
+
+    rho, w = np.polynomial.legendre.leggauss(legendre_deg)
+    rho = (rho + 1) / 2
+    w /= 2
+
+    N = focal_length / aperture
+
     def defocusPSF(x: Number, y: Number) -> float:
-        r = np.sqrt(x**2 + y**2)
-        N = focal_length / aperture
-        integral = quad_vec(lambda rho: np.exp(1j*2*np.pi/wavelength*defocus*rho**2) * j0(np.pi*r*rho/wavelength/N) * rho, 0, 1, epsabs=1e-10, epsrel=1e-8)[0]
+        r = np.sqrt(x**2 + y**2)[..., np.newaxis]
+        integrand = np.exp(1j*2*np.pi/wavelength*defocus*rho**2) * j0(np.pi*r*rho/wavelength/N) * rho
+        integral = np.sum(integrand * w, axis=-1)
         return np.pi / (wavelength * N)**2 *  (np.real(integral)**2 + np.imag(integral)**2)
     return defocusPSF
