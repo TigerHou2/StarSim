@@ -24,6 +24,7 @@ test = [
 ]
 doc = [
     "ipykernel",
+    "numpydoc",
     "sphinx",
     "pydata-sphinx-theme",
     "nbsphinx"
