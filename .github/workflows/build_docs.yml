@@ -8,6 +8,13 @@ on:
       - "STLib/**"
       - ".github/workflows/build_docs.yml"
       - "pyproject.toml"
+  pull_request:
+    branches: ["**"]
+    paths:
+      - "docs/**"
+      - "STLib/**"
+      - ".github/workflows/build_docs.yml"
+      - "pyproject.toml"
 
 permissions:
   contents: write
